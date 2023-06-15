@@ -4,11 +4,13 @@
 import urllib
 import m3u8
 import streamlink
+import subprocess
+import os
 
 
 def get_stream(url):
     """
-    Get upload chunk url
+    Get upload chunk URL
     """
     streams = streamlink.streams(url)
     stream_url = streams["best"]
@@ -19,22 +21,34 @@ def get_stream(url):
 
 def dl_stream(url, filename, chunks):
     """
-    Download each chunks
+    Download and save video frames as PNG files
     """
     pre_time_stamp = 0
     for i in range(chunks+1):
         stream_segment = get_stream(url)
-        cur_time_stamp = \
-            stream_segment.program_date_time.strftime("%Y%m%d-%H%M%S")
+        cur_time_stamp = stream_segment.program_date_time.strftime("%Y%m%d-%H%M%S")
 
         if pre_time_stamp == cur_time_stamp:
             pass
         else:
             print(cur_time_stamp)
-            file = open(filename + '_' + str(cur_time_stamp) + '.ts', 'ab+')
+
+            # Download the segment
             with urllib.request.urlopen(stream_segment.uri) as response:
-                html = response.read()
-                file.write(html)
+                data = response.read()
+
+            # Save the segment as a temporary video file
+            temp_filename = filename + '_temp.ts'
+            with open(temp_filename, 'wb') as file:
+                file.write(data)
+
+            # Extract video frames using ffmpeg
+            output_filename = filename + '_' + str(cur_time_stamp) + '.png'
+            subprocess.run(['ffmpeg', '-i', temp_filename, '-vf', 'fps=1', output_filename])
+
+            # Delete the temporary video file
+            os.remove(temp_filename)
+
             pre_time_stamp = cur_time_stamp
 
 
